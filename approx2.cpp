@@ -1,21 +1,25 @@
 #include "approx2.h"
 #include <stdlib.h>
-#include <string.h>
 
-static void solve_tridiagonal(int n, double *a, double *b, double *c, double *d, double *x) {
+static void solve_tridiagonal(int n, double *sub, double *diag, double *sup, double *rhs, double *x) {
     double *alpha = (double*)malloc((n-1) * sizeof(double));
-    double *beta  = (double*)malloc((n-1) * sizeof(double));
+    double *beta = (double*)malloc((n-1) * sizeof(double));
     
-    alpha[0] = -c[0] / b[0];
-    beta[0]  =  d[0] / b[0];
-    
-    for (int i = 1; i < n-1; i++) {
-        double denom = b[i] + a[i] * alpha[i-1];
-        alpha[i] = -c[i] / denom;
-        beta[i]  = (d[i] - a[i] * beta[i-1]) / denom;
+    if (!alpha || !beta) {
+        free(alpha); free(beta);
+        return;
     }
     
-    x[n-1] = (d[n-1] - a[n-1] * beta[n-2]) / (b[n-1] + a[n-1] * alpha[n-2]);
+    alpha[0] = -sup[0] / diag[0];
+    beta[0] = rhs[0] / diag[0];
+    
+    for (int i = 1; i < n-1; i++) {
+        double denom = diag[i] + sub[i-1] * alpha[i-1];
+        alpha[i] = -sup[i] / denom;
+        beta[i] = (rhs[i] - sub[i-1] * beta[i-1]) / denom;
+    }
+    
+    x[n-1] = (rhs[n-1] - sub[n-2] * beta[n-2]) / (diag[n-1] + sub[n-2] * alpha[n-2]);
     
     for (int i = n-2; i >= 0; i--) {
         x[i] = alpha[i] * x[i+1] + beta[i];
@@ -57,8 +61,10 @@ void build_approx2(int n, const double *x, const double *f, double *a, double *w
     for (int i = 0; i < n; i++) {
         diag[i] = 0.0;
         rhs[i] = 0.0;
-        if (i < n-1) sub[i] = 0.0;
-        if (i < n-1) sup[i] = 0.0;
+        if (i < n-1) {
+            sub[i] = 0.0;
+            sup[i] = 0.0;
+        }
     }
     
     for (int i = 1; i < n-1; i++) {
