@@ -46,7 +46,7 @@ Window::Window(QWidget *parent)
       x_nodes(nullptr), f_vals(nullptr), coef1(nullptr), coef2(nullptr),
       work(nullptr), alloc_n(0)
 {
-    setFocusPolicy(Qt::StrongFocus);  
+    setFocusPolicy(Qt::StrongFocus); 
     recompute();
 }
 
