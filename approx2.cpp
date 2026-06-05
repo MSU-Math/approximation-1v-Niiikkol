@@ -1,5 +1,6 @@
 #include "approx2.h"
 #include <stdlib.h>
+#include <math.h>
 
 static void solve_tridiagonal(int n, double *a, double *b, double *c, double *d, double *x) {
     double *alpha = (double*)malloc((n-1) * sizeof(double));
@@ -7,12 +8,15 @@ static void solve_tridiagonal(int n, double *a, double *b, double *c, double *d,
     
     alpha[0] = -c[0] / b[0];
     beta[0]  =  d[0] / b[0];
+    
     for (int i = 1; i < n-1; i++) {
         double denom = b[i] + a[i] * alpha[i-1];
         alpha[i] = -c[i] / denom;
         beta[i]  = (d[i] - a[i] * beta[i-1]) / denom;
     }
+    
     x[n-1] = (d[n-1] - a[n-1] * beta[n-2]) / (b[n-1] + a[n-1] * alpha[n-2]);
+    
     for (int i = n-2; i >= 0; i--) {
         x[i] = alpha[i] * x[i+1] + beta[i];
     }
@@ -24,119 +28,132 @@ static void solve_tridiagonal(int n, double *a, double *b, double *c, double *d,
 void build_approx2(int n, const double *x, const double *f, double *a, double *work) {
     if (n < 2) return;
 
-    double *ksi = work;                
-    double *v   = work + (n+2);         
+    double *ksi = work;        
+    double *v   = work + (n+2); 
     
-    ksi[0] = x[0];          
-    ksi[n+1] = x[n-1];    
+    ksi[0] = x[0];   
+    ksi[n+1] = x[n-1]; 
+    for (int i = 1; i <= n; i++) {
+        ksi[i] = (x[i-1] + x[i]) / 2.0; 
+    }
+
+    ksi[0] = x[0];
     for (int i = 1; i <= n; i++) {
         ksi[i] = (x[i-1] + x[i]) / 2.0;
     }
-    
+    ksi[n] = x[n-1]; 
 
-    int m = n+1;
-    double *diag = (double*)malloc(m * sizeof(double));
-    double *sub  = (double*)malloc(m * sizeof(double));
-    double *sup  = (double*)malloc(m * sizeof(double));
-    double *rhs  = (double*)malloc(m * sizeof(double));
+    int m = n + 1;
+    double *diag = (double*)calloc(m, sizeof(double));
+    double *sub  = (double*)calloc(m, sizeof(double));
+    double *sup  = (double*)calloc(m, sizeof(double));
+    double *rhs  = (double*)calloc(m, sizeof(double));
     
-    for (int i = 0; i < m; i++) {
-        diag[i] = 0.0;
-        sub[i] = 0.0;
-        sup[i] = 0.0;
-        rhs[i] = 0.0;
-    }
-    
-    
-    for (int i = 1; i <= n-1; i++) {
-        double hL = ksi[i] - ksi[i-1];
-        double hR = ksi[i+1] - ksi[i];
-        double xL = x[i-1];
-        double xR = x[i];
+    for (int i = 2; i <= n; i++) {
+        int idx = i - 1;  
         
-        double coeff_v_left   = 1.0/(xL - ksi[i-1]) - 1.0/hL;
-        double coeff_v_center = 1.0/(ksi[i] - xL) + 1.0/hL + 1.0/(xR - ksi[i]) + 1.0/hR;
-        double coeff_v_right  = 1.0/(ksi[i+1] - xR) - 1.0/hR;
+        double xi_prev = x[i-2];   
+        double xi_curr = x[i-1];   
         
-        sub[i-1] = coeff_v_left;
-        diag[i]  = coeff_v_center;
-        sup[i+1] = coeff_v_right;
+        double ksi_prev = ksi[i-2]; 
+        double ksi_curr = ksi[i-1]; 
+        double ksi_next = ksi[i];   
         
-        rhs[i] = (1.0/(xL - ksi[i-1]) + 1.0/(ksi[i] - xL)) * f[i-1]
-               + (1.0/(xR - ksi[i]) + 1.0/(ksi[i+1] - xR)) * f[i];
-    }
-    
-    if (n >= 3) {
-        double h12 = ksi[2] - ksi[1];
-        double h01 = ksi[1] - ksi[0];
-        double x0 = x[0], x1 = x[1];
-        
-        double left_v0 = -1.0/(h01 * (x0 - ksi[0]));
-        double left_v1 =  1.0/(h01 * (x0 - ksi[0])) + 1.0/(h12 * (x1 - ksi[1])) - 1.0/(h12 * (ksi[2] - x1));
-        double left_v2 = -1.0/(h12 * (x1 - ksi[1]));
-        
-        sub[0] += left_v0;
-        diag[1] += left_v1;
-        sup[2] += left_v2;
 
+        double coeff_left   = 1.0/(xi_prev - ksi_prev) - 1.0/(ksi_curr - ksi_prev);
+        double coeff_center = 1.0/(ksi_curr - xi_prev) + 1.0/(ksi_curr - ksi_prev) 
+                            + 1.0/(xi_curr - ksi_curr) + 1.0/(ksi_next - ksi_curr);
+        double coeff_right  = 1.0/(ksi_next - xi_curr) - 1.0/(ksi_next - ksi_curr);
+        
+        sub[idx-1] += coeff_left;
+        diag[idx]   += coeff_center;
+        sup[idx+1]  += coeff_right;
+        
+        rhs[idx] = (1.0/(xi_prev - ksi_prev) + 1.0/(ksi_curr - xi_prev)) * f[i-2]
+                 + (1.0/(xi_curr - ksi_curr) + 1.0/(ksi_next - xi_curr)) * f[i-1];
     }
+    
 
     if (n >= 3) {
-        int n_idx = n-1;
-        double h_prev = ksi[n_idx] - ksi[n_idx-1];
-        double h_last = ksi[n_idx+1] - ksi[n_idx];
-        double x_last1 = x[n-2], x_last2 = x[n-1];
+        double xi1 = x[0], xi2 = x[1];
+        double ksi1 = ksi[0], ksi2 = ksi[1], ksi3 = ksi[2];
         
-        double right_v_nm1 = -1.0/(h_prev * (x_last1 - ksi[n_idx-1]));
-        double right_v_n   =  1.0/(h_prev * (x_last1 - ksi[n_idx-1])) 
-                           + 1.0/(h_last * (x_last2 - ksi[n_idx])) 
-                           - 1.0/(h_last * (ksi[n_idx+1] - x_last2));
-        double right_v_np1 = -1.0/(h_last * (x_last2 - ksi[n_idx]));
+        double denom1 = ksi2 - ksi1;
+        double denom2 = ksi3 - ksi2;
         
-        sub[n_idx-1] += right_v_nm1;
-        diag[n_idx]   += right_v_n;
-        sup[n_idx+1]  += right_v_np1;
+
+        double coeff_v1 = -1.0/(denom1 * (xi1 - ksi1));
+        double coeff_v2 =  1.0/(denom1 * (xi1 - ksi1)) 
+                         + 1.0/(denom2 * (xi2 - ksi2));
+        double coeff_v3 = -1.0/(denom2 * (xi2 - ksi2));
+        
+        double rhs_val = -1.0/(denom1 * (ksi2 - xi1)) * f[0]
+                        + (1.0/(denom1 * (ksi2 - xi1)) - 1.0/(denom2 * (ksi3 - xi2))) * f[1]
+                        + 1.0/(denom2 * (ksi3 - xi2)) * f[2];
+        
+        sub[0] += coeff_v1;
+        diag[1] += coeff_v2;
+        sup[2] += coeff_v3;
+        rhs[1] += rhs_val;
+    }
+
+    if (n >= 3) {
+        int i = n - 2;
+        double xi_prev = x[i-1], xi_curr = x[i];
+        double ksi_prev = ksi[i-1], ksi_curr = ksi[i], ksi_next = ksi[i+1];
+        
+        double denom1 = ksi_curr - ksi_prev;
+        double denom2 = ksi_next - ksi_curr;
+        
+        double coeff_v_prev = -1.0/(denom1 * (xi_prev - ksi_prev));
+        double coeff_v_curr =  1.0/(denom1 * (xi_prev - ksi_prev)) 
+                             + 1.0/(denom2 * (xi_curr - ksi_curr));
+        double coeff_v_next = -1.0/(denom2 * (xi_curr - ksi_curr));
+        
+        double rhs_val = -1.0/(denom1 * (ksi_curr - xi_prev)) * f[i-1]
+                        + (1.0/(denom1 * (ksi_curr - xi_prev)) - 1.0/(denom2 * (ksi_next - xi_curr))) * f[i]
+                        + 1.0/(denom2 * (ksi_next - xi_curr)) * f[i+1];
+        
+        int idx = i;
+        sub[idx-1] += coeff_v_prev;
+        diag[idx]   += coeff_v_curr;
+        sup[idx+1]  += coeff_v_next;
+        rhs[idx]    += rhs_val;
     }
     
 
-    solve_tridiagonal(m, sub, diag, sup, rhs, v);
+    solve_tridiagonal(m, sub, diag, sup, rhs, v + 1);
 
+    v[0] = f[0];
+    v[n] = f[n-1];
+    
+  
     for (int i = 0; i < n-1; i++) {
         double xi = x[i];
         double xip1 = x[i+1];
         double h = xip1 - xi;
-        double mid = (xi + xip1) / 2.0;
 
-        double P_i_mid, P_ip1_mid;
+        double x_mid = (xi + xip1) / 2.0;
         
-        double ksiL = ksi[i];
-        double ksiR = ksi[i+1];
-        double x_center = x[i];
-        double vL = v[i];
-        double vR = v[i+1];
-        double A = (f[i] - vL) / (x_center - ksiL);
-        double B = (1.0/(ksiR - ksiL)) * ((vR - f[i])/(ksiR - x_center) - (f[i] - vL)/(x_center - ksiL));
-        P_i_mid = vL + A*(mid - ksiL) + B*(mid - ksiL)*(mid - x_center);
-        
-        if (i < n-2) {
-            ksiL = ksi[i+1];
-            ksiR = ksi[i+2];
-            x_center = x[i+1];
-            vL = v[i+1];
-            vR = v[i+2];
-            A = (f[i+1] - vL) / (x_center - ksiL);
-            B = (1.0/(ksiR - ksiL)) * ((vR - f[i+1])/(ksiR - x_center) - (f[i+1] - vL)/(x_center - ksiL));
-            P_ip1_mid = vL + A*(mid - ksiL) + B*(mid - ksiL)*(mid - x_center);
-        } else {
-            P_ip1_mid = f[i+1];
+
+        int k = 0;
+        for (k = 0; k < n; k++) {
+            if (x_mid >= ksi[k] && x_mid <= ksi[k+1]) break;
         }
+
+        double vL = v[k];
+        double vR = v[k+1];
+        double xk = x[k];
+        double ksiL = ksi[k];
+        double ksiR = ksi[k+1];
         
-        double f_mid = (P_i_mid + P_ip1_mid) / 2.0;
-        
+        double A = (f[k] - vL) / (xk - ksiL);
+        double B = 1.0/(ksiR - ksiL) * ((vR - f[k])/(ksiR - xk) - (f[k] - vL)/(xk - ksiL));
+        double P_at_mid = vL + A*(x_mid - ksiL) + B*(x_mid - ksiL)*(x_mid - xk);
 
         double c0 = f[i];
         double c1 = (f[i+1] - f[i]) / h;
-        double c2 = (f_mid - c0 - c1 * h / 2.0) / (h * h / 4.0);
+        double c2 = (P_at_mid - c0 - c1 * (x_mid - xi)) / ((x_mid - xi) * (x_mid - xi));
         
         a[3*i + 0] = c0;
         a[3*i + 1] = c1;
@@ -150,11 +167,9 @@ void build_approx2(int n, const double *x, const double *f, double *a, double *w
 }
 
 double eval_approx2(double t, double /*xl*/, double /*xr*/, int n, const double *x, const double *a) {
-    int i;
-    if (n < 2) {
-        return 0.0;
-    }
+    if (n < 2) return 0.0;
     
+    int i;
     if (t <= x[0]) {
         i = 0;
     } else if (t >= x[n-1]) {
