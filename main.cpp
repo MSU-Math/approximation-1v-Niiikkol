@@ -1,4 +1,3 @@
-
 #include <QAction>
 #include <QApplication>
 #include <QDebug>
@@ -37,6 +36,10 @@ int main(int argc, char *argv[])
     window->setMenuBar(tool_bar);
     window->setCentralWidget(graph_area);
     window->setWindowTitle("Graph");
+
+
+    graph_area->setFocus();
+    graph_area->setFocusPolicy(Qt::StrongFocus);
 
     window->show();
     return app.exec();

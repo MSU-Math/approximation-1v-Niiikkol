@@ -21,6 +21,8 @@ class Window : public QWidget
     double eval2(double t) const;
 
   protected:
+  protected:
+    bool event(QEvent *event) override;
     void paintEvent(QPaintEvent *event);
     void keyPressEvent(QKeyEvent *event);
 
