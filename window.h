@@ -25,21 +25,21 @@ class Window : public QWidget
     void keyPressEvent(QKeyEvent *event);
 
   private:
-    double a; /* original left endpoint */
-    double b; /* original right endpoint */
-    int n;    /* number of interpolation nodes */
-    int k;    /* function index 0..6 */
-    int p;    /* perturbation level */
-    int mode; /* display mode 0..3 */
-    int zoom; /* zoom exponent s (view = [a/2^s, b/2^s]) */
+    double a; 
+    double b; 
+    int n;    
+    int k;    
+    int p;    
+    int mode; 
+    int zoom; 
 
-    double *x_nodes; /* interpolation nodes [n] */
-    double *f_vals;  /* (possibly perturbed) function values [n] */
-    double *coef1;   /* Akima coefficients [4*(n-1)] */
-    double *coef2;   /* parabolic coefficients [3*(n-1)] */
-    double *work;    /* work array [2*n] */
+    double *x_nodes; 
+    double *f_vals;  
+    double *coef1;   
+    double *coef2;   
+    double *work;    
 
-    int alloc_n; /* currently allocated size */
+    int alloc_n; 
 
     void recompute();
     void allocate(int new_n);
@@ -53,4 +53,4 @@ class Window : public QWidget
                     const QColor &color) const;
 };
 
-#endif /* WINDOW_H */
+#endif 

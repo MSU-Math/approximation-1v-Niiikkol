@@ -17,14 +17,13 @@ void build_approx1(int n, const double *x, const double *f, double *a, double *w
 {
     int i;
     double h, di;
-    double *d = work;       /* differences, size n-1 */
-    double *s = work + n;   /* slopes, size n */
+    double *d = work;       
+    double *s = work + n;   
 
     if (n < 2) {
         return;
     }
 
-    /* Step 1: compute differences */
     for (i = 0; i < n - 1; i++) {
         h = x[i + 1] - x[i];
         d[i] = (f[i + 1] - f[i]) / h;
@@ -34,36 +33,35 @@ void build_approx1(int n, const double *x, const double *f, double *a, double *w
         s[0] = d[0];
         s[1] = d[0];
     } else if (n == 3) {
-        /* Only one interior node i=1, use average */
+
         s[1] = 0.5 * (d[0] + d[1]);
         s[0] = (3.0 * d[0] - s[1]) / 2.0;
         s[2] = (3.0 * d[1] - s[1]) / 2.0;
     } else {
-        /* Step 2: interior Akima slopes i=2..n-3 */
+
         for (i = 2; i <= n - 3; i++) {
             s[i] = akima_slope(d[i - 2], d[i - 1], d[i], d[i + 1]);
         }
 
-        /* Step 3: near-boundary nodes with one ghost difference */
+
         {
-            /* i=1: ghost d[-1] = 2*d[0] - d[1] */
+
             double dm1 = 2.0 * d[0] - d[1];
 
             s[1] = akima_slope(dm1, d[0], d[1], d[2]);
         }
         {
-            /* i=n-2: ghost d[n-1] = 2*d[n-2] - d[n-3] */
+
             double dn1 = 2.0 * d[n - 2] - d[n - 3];
 
             s[n - 2] = akima_slope(d[n - 4], d[n - 3], d[n - 2], dn1);
         }
 
-        /* Step 4: natural BC at endpoints */
         s[0] = (3.0 * d[0] - s[1]) / 2.0;
         s[n - 1] = (3.0 * d[n - 2] - s[n - 2]) / 2.0;
     }
 
-    /* Step 5: build cubic Hermite coefficients */
+
     for (i = 0; i < n - 1; i++) {
         h = x[i + 1] - x[i];
         di = (f[i + 1] - f[i]) / h;
