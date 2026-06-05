@@ -26,19 +26,22 @@ static void solve_tridiagonal(int n, double *a, double *b, double *c, double *d,
 }
 
 void build_approx2(int n, const double *x, const double *f, double *a, double *work) {
+    (void)work;
+    
     if (n < 2) return;
     
-    for (int i = 0; i < n-1; i++) {
-        if (x[i] >= x[i+1]) return;
+    double *d = (double*)malloc(n * sizeof(double));
+    double *diag = (double*)malloc(n * sizeof(double));
+    double *sub = (double*)malloc((n-1) * sizeof(double));
+    double *sup = (double*)malloc((n-1) * sizeof(double));
+    double *rhs = (double*)malloc(n * sizeof(double));
+    double *div_diff = (double*)malloc((n-1) * sizeof(double));
+    
+    if (!d || !diag || !sub || !sup || !rhs || !div_diff) {
+        free(d); free(diag); free(sub); free(sup); free(rhs); free(div_diff);
+        return;
     }
     
-    double *d = work;
-    double *diag = work + n;
-    double *sub = work + 2*n;
-    double *sup = work + 3*n;
-    double *rhs = work + 4*n;
-    
-    double *div_diff = (double*)malloc((n-1) * sizeof(double));
     for (int i = 0; i < n-1; i++) {
         div_diff[i] = (f[i+1] - f[i]) / (x[i+1] - x[i]);
     }
@@ -47,7 +50,7 @@ void build_approx2(int n, const double *x, const double *f, double *a, double *w
         a[0] = f[0];
         a[1] = div_diff[0];
         a[2] = 0.0;
-        free(div_diff);
+        free(d); free(diag); free(sub); free(sup); free(rhs); free(div_diff);
         return;
     }
     
@@ -90,6 +93,11 @@ void build_approx2(int n, const double *x, const double *f, double *a, double *w
         a[3*i + 2] = a2;
     }
     
+    free(d);
+    free(diag);
+    free(sub);
+    free(sup);
+    free(rhs);
     free(div_diff);
 }
 
