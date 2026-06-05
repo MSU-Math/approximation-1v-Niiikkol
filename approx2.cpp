@@ -44,7 +44,6 @@ void build_approx2(int n, const double *x, const double *f, double *a, double *w
     }
     
     if (n == 2) {
-        double h = x[1] - x[0];
         a[0] = f[0];
         a[1] = div_diff[0];
         a[2] = 0.0;
